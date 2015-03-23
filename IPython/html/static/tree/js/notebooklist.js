@@ -92,6 +92,7 @@ define([
                             OK: {'class': 'btn-primary'}
                         }
                     });
+                    console.warn('Error durring New file creation', e);
                 });
                 that.load_sessions();
             });
@@ -111,6 +112,7 @@ define([
                             OK: {'class': 'btn-primary'}
                         }
                     });
+                    console.warn('Error durring New directory creation', e);
                 });
                 that.load_sessions();
             });
@@ -122,14 +124,25 @@ define([
             $('.delete-button').click($.proxy(this.delete_selected, this));
 
             // Bind events for selection menu buttons.
-            $('#selector-menu').click(function(event){that.select($(event.target).attr('id'))});
-            $('#select-all').change(function(){that.select($(this).is(':checked') ? 'select-all' : 'select-none')});
-            $('#button-select-all').click(function(e) {
+            $('#selector-menu').click(function (event) {
+                that.select($(event.target).attr('id'));
+            });
+            var select_all = $('#select-all');
+            select_all.change(function () {
+                if (!select_all.prop('checked') || select_all.data('indeterminate')) {
+                    that.select('select-none');
+                } else {
+                    that.select('select-all');
+                }
+            });
+            $('#button-select-all').click(function (e) {
                 // toggle checkbox if the click doesn't come from the checkbox already
                 if (!$(e.target).is('input[type=checkbox]')) {
-                    var checkbox = $('#select-all');
-                    checkbox.prop('checked', !checkbox.prop('checked'));
-                    that.select(checkbox.prop('checked') ? 'select-all' : 'select-none');
+                    if (select_all.prop('checked') || select_all.data('indeterminate')) {
+                        that.select('select-none');
+                    } else {
+                        that.select('select-all');
+                    }
                 }
             });
         }
@@ -438,8 +451,8 @@ define([
         });
         this.selected = selected;
 
-        // Rename is only visible when one item is selected.
-        if (selected.length==1) {
+        // Rename is only visible when one item is selected, and it is not a running notebook
+        if (selected.length==1 && !has_running_notebook) {
             $('.rename-button').css('display', 'inline-block');
         } else {
             $('.rename-button').css('display', 'none');
@@ -479,18 +492,30 @@ define([
                 total++;
             }
         });
+        
+        var select_all = $("#select-all");
         if (checked === 0) {
-            $('#tree-selector input[type=checkbox]')[0].indeterminate = false;
-            $('#tree-selector input[type=checkbox]').prop('checked', false);
+            select_all.prop('checked', false);
+            select_all.prop('indeterminate', false);
+            select_all.data('indeterminate', false);
         } else if (checked === total) {
-            $('#tree-selector input[type=checkbox]')[0].indeterminate = false;
-            $('#tree-selector input[type=checkbox]').prop('checked', true);
+            select_all.prop('checked', true);
+            select_all.prop('indeterminate', false);
+            select_all.data('indeterminate', false);
         } else {
-            $('#tree-selector input[type=checkbox]').prop('checked', false);
-            $('#tree-selector input[type=checkbox]')[0].indeterminate = true;
+            select_all.prop('checked', false);
+            select_all.prop('indeterminate', true);
+            select_all.data('indeterminate', true);
         }
         // Update total counter
         $('#counter-select-all').html(checked===0 ? '&nbsp;' : checked);
+
+        // If at aleast on item is selected, hide the selection instructions.
+        if (checked > 0) {
+            $('.dynamic-instructions').hide();
+        } else {
+            $('.dynamic-instructions').show();
+        }
     };
 
     NotebookList.prototype.add_link = function (model, item) {
@@ -586,29 +611,31 @@ define([
         if (this.selected.length != 1) return;
 
         var that = this;
-        var path = this.selected[0].path;
+        var item_path = this.selected[0].path;
+        var item_name = this.selected[0].name;
+        var item_type = this.selected[0].type;
         var input = $('<input/>').attr('type','text').attr('size','25').addClass('form-control')
-            .val(path);
+            .val(item_name);
         var dialog_body = $('<div/>').append(
             $("<p/>").addClass("rename-message")
-                .text('Enter a new directory name:')
+                .text('Enter a new '+ item_type + ' name:')
         ).append(
             $("<br/>")
         ).append(input);
         var d = dialog.modal({
-            title : "Rename directory",
+            title : "Rename "+ item_type,
             body : dialog_body,
             buttons : {
                 OK : {
                     class: "btn-primary",
                     click: function() {
-                        that.contents.rename(path, input.val()).then(function() {
+                        that.contents.rename(item_path, utils.url_path_join(that.notebook_path, input.val())).then(function() {
                             that.load_list();
                         }).catch(function(e) { 
                             dialog.modal({
                                 title: "Rename Failed",
                                 body: $('<div/>')
-                                    .text("An error occurred while renaming \"" + path + "\" to \"" + input.val() + "\".")
+                                    .text("An error occurred while renaming \"" + item_name + "\" to \"" + input.val() + "\".")
                                     .append($('<div/>')
                                         .addClass('alert alert-danger')
                                         .text(e.message || e)),
@@ -616,6 +643,7 @@ define([
                                     OK: {'class': 'btn-primary'}
                                 }
                             });
+                            console.warn('Error durring renaming :', e);
                         });
                     }
                 },
@@ -669,6 +697,7 @@ define([
                                         OK: {'class': 'btn-primary'}
                                     }
                                 });
+                                console.warn('Error durring content deletion:', e);
                             });
                         });
                     }
@@ -687,7 +716,7 @@ define([
         }
         var that = this;
         dialog.modal({
-            title : "Delete",
+            title : "Duplicate",
             body : message,
             buttons : {
                 Duplicate : {
@@ -698,9 +727,9 @@ define([
                                 that.load_list();
                             }).catch(function(e) { 
                                 dialog.modal({
-                                    title: "Delete Failed",
+                                    title: "Duplicate Failed",
                                     body: $('<div/>')
-                                        .text("An error occurred while deleting \"" + item.path + "\".")
+                                        .text("An error occurred while duplicating \"" + item.path + "\".")
                                         .append($('<div/>')
                                             .addClass('alert alert-danger')
                                             .text(e.message || e)),
@@ -708,6 +737,7 @@ define([
                                         OK: {'class': 'btn-primary'}
                                     }
                                 });
+                                console.warn('Error durring content duplication', e);
                             });
                         });
                     }
@@ -782,6 +812,7 @@ define([
                                 }
                             }}
                         });
+                        console.warn('Error durring notebook uploading', e);
                         return false;
                     }
                     content_type = 'application/json';

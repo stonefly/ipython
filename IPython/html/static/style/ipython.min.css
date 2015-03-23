@@ -747,6 +747,7 @@ div.output_wrapper {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  z-index: 1;
 }
 /* class for the output area when it should be height-limited */
 div.output_scroll {
@@ -1475,6 +1476,12 @@ h6:hover .anchor-link {
 }
 .widget_item .dropdown-menu li a {
   color: inherit;
+}
+.widget-valid {
+  margin-top: 9px;
+  margin-bottom: 10px;
+  margin-left: 3px;
+  margin-right: 3px;
 }
 .widget-hbox {
   /* Horizontal widgets */
